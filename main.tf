@@ -1,5 +1,6 @@
 provider "aws" {
   region = var.aws_region
+  profile = "my-dev-profile"
 }
 
 data "aws_availability_zones" "available" {
@@ -67,8 +68,8 @@ module "elb_http" {
   security_groups = [module.lb_security_group.security_group_id]
   subnets         = module.vpc.public_subnets
 
-  number_of_instances = 2
-  instances           = [aws_instance.app_a.id, aws_instance.app_b.id]
+  number_of_instances = length(aws_instance.app)
+  instances           = aws_instance.app.*.id
 
   listener = [{
     instance_port     = "80"
@@ -96,13 +97,13 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-resource "aws_instance" "app_a" {
+resource "aws_instance" "app" {
   depends_on = [module.vpc]
-
+  count = var.instance_per_subnet * length(module.vpc.private_subnets)
   ami           = data.aws_ami.amazon_linux.id
   instance_type = var.instance_type
 
-  subnet_id              = module.vpc.private_subnets[0]
+  subnet_id              = module.vpc.private_subnets[count.index % length(module.vpc.private_subnets)]
   vpc_security_group_ids = [module.app_security_group.security_group_id]
 
   user_data = <<-EOF
@@ -121,6 +122,7 @@ resource "aws_instance" "app_a" {
   }
 }
 
+/*
 resource "aws_instance" "app_b" {
   depends_on = [module.vpc]
 
@@ -145,3 +147,4 @@ resource "aws_instance" "app_b" {
     Environment = var.environment
   }
 }
+*/
